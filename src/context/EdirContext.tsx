@@ -769,44 +769,56 @@ export const EdirProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithGoogle: EdirContextValue['signInWithGoogle'] = async () => {
+    setAuthErrorMsg(null);
+    setPopupBlocked(false);
+
+    const inIframe = typeof window !== 'undefined' && window.self !== window.top;
+    if (!inIframe) {
+      try {
+        await signInWithRedirect(auth, googleProvider);
+        return { ok: true };
+      } catch (err) {
+        const code = (err as { code?: string })?.code || '';
+        if (code === 'auth/unauthorized-domain') {
+          const host = window.location.hostname;
+          return {
+            ok: false,
+            errorAm: `ይህ ዶሜይን (${host}) በFirebase Authorized Domains ውስጥ አልተፈቀደም።`,
+            errorEn: `Domain "${host}" is not authorized in Firebase Authentication > Settings > Authorized domains.`,
+          };
+        }
+        if (code === 'auth/operation-not-allowed') {
+          return {
+            ok: false,
+            errorAm: 'የGoogle Sign-In አገልግሎት በFirebase Console Authentication ውስጥ ገና አልተከፈተም።',
+            errorEn: 'Google Sign-In provider is not enabled in Firebase Authentication > Sign-in method.',
+          };
+        }
+        const msg = err instanceof Error ? err.message : 'Google Sign-In failed';
+        return { ok: false, errorAm: msg, errorEn: msg };
+      }
+    }
+
     try {
-      // Trigger signInWithPopup synchronously before any React state mutations
-      // so browsers strictly preserve the user-gesture activation for the popup.
+      // Preview embeds can block full-page redirects, so use a popup there.
       const popupPromise = signInWithPopup(auth, googleProvider);
-      setAuthErrorMsg(null);
-      setPopupBlocked(false);
       const cred = await popupPromise;
       return await resolveSignedInUser(cred.user);
     } catch (err) {
       const code = (err as { code?: string })?.code || '';
       if (
         code === 'auth/popup-blocked' ||
-        code === 'auth/operation-not-supported-in-this-environment'
+        code === 'auth/operation-not-supported-in-this-environment' ||
+        code === 'auth/popup-closed-by-user' ||
+        code === 'auth/cancelled-popup-request'
       ) {
-        const inIframe = typeof window !== 'undefined' && window.self !== window.top;
-        if (!inIframe) {
-          try {
-            await signInWithRedirect(auth, googleProvider);
-            return { ok: true };
-          } catch (redirectErr) {
-            const msg = redirectErr instanceof Error ? redirectErr.message : 'Redirect Sign-In failed';
-            return { ok: false, errorAm: msg, errorEn: msg };
-          }
-        }
         setPopupBlocked(true);
         return {
           ok: false,
           errorAm:
-            'ብራውዘርዎ የGoogle መግቢያ Pop-up መስኮቱን አግዶታል። ከታች "በአዲስ Tab ክፈትና ግባ" የሚለውን ይጫኑ ወይም በአድራሻ አሞሌው Pop-ups ይፍቀዱ።',
+            'ብራውዘርዎ የGoogle መግቢያ Pop-up መስኮቱን አግዶታል። ከታች "በአዲስ Tab ክፈትና ግባ" የሚለውን ይጫኑ።',
           errorEn:
-            'Your browser blocked the Google Sign-In popup inside the preview frame. Click "Open in New Tab to Sign In" below or allow pop-ups in your address bar.',
-        };
-      }
-      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-        return {
-          ok: false,
-          errorAm: 'የGoogle መግቢያው ሳይጠናቀቅ ተዘግቷል። እባክዎ እንደገና ይሞክሩ።',
-          errorEn: 'Google Sign-In window was closed before finishing. Please try again.',
+            'The Google sign-in popup was blocked or closed. Click "Open in New Tab to Sign In" below to continue.',
         };
       }
       if (code === 'auth/unauthorized-domain') {
