@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: "Plus Jakarta Sans", "Noto Sans Ethiopic", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: "JetBrains Mono", "Noto Sans Ethiopic", monospace;
+    --edir-forest: #0e4d34;
+    --edir-forest-hover: #0a3b27;
+    --edir-gold: #b8821e;
+    --edir-gold-soft: #fdf8ee;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #f7f8f7;
+    color: #0f172a;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .print-container {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
