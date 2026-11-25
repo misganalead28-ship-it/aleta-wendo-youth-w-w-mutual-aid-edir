@@ -14,6 +14,8 @@ export const MemberRequests: React.FC = () => {
   const [requestedAmount, setRequestedAmount] = useState('');
   const [attachmentName, setAttachmentName] = useState('');
 
+  if (!currentUser) return null;
+
   const myRequests = requests.filter((r) => r.memberId === currentUser.id);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -244,7 +246,7 @@ export const MemberRequests: React.FC = () => {
                     <h4 className="text-sm font-bold text-[#0F172A]">
                       {lang === 'am' ? req.titleAm : req.titleEn}
                     </h4>
-                    {req.requestedAmountEtb && (
+                    {req.requestedAmountEtb > 0 && (
                       <span className="font-mono text-sm font-bold text-[#0E4D34] shrink-0 tabular-nums">
                         {req.requestedAmountEtb.toLocaleString()} {tr('etb', lang)}
                       </span>

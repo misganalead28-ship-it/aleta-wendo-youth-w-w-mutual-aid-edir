@@ -15,9 +15,11 @@ export const QrAttendanceScanner: React.FC = () => {
   const { lang, currentUser, meetings, recordQrAttendance } = useEdir();
 
   const liveMeeting = meetings.find((m) => m.status === 'live') || meetings[0];
-  const isOutOfTown = currentUser.residenceType === 'out_of_town';
+  const isOutOfTown = currentUser?.residenceType === 'out_of_town';
 
-  const myRecord = liveMeeting?.attendance.find((a) => a.memberId === currentUser.id);
+  const myRecord = currentUser
+    ? liveMeeting?.attendance.find((a) => a.memberId === currentUser.id)
+    : undefined;
   const isCheckedIn = myRecord?.status === 'present';
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -32,6 +34,8 @@ export const QrAttendanceScanner: React.FC = () => {
       }
     };
   }, []);
+
+  if (!currentUser) return null;
 
   const startCamera = async () => {
     setCameraError(null);
@@ -115,7 +119,13 @@ export const QrAttendanceScanner: React.FC = () => {
       )}
 
       {/* Active Meeting Card + Scanner Interface */}
-      {liveMeeting && (
+      {!liveMeeting ? (
+        <section className="bg-white border border-[#DCE2DD] rounded-2xl p-8 text-center text-sm text-[#64748B]">
+          {lang === 'am'
+            ? 'በአሁኑ ጊዜ የተጠራ ስብሰባ የለም። ኮሚቴው ስብሰባ ሲጠራ QR ኮዱ እዚህ ይታያል።'
+            : 'No active meeting scheduled right now. When the committee calls a meeting, the QR check-in scanner will appear here.'}
+        </section>
+      ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Scanner Viewport */}
           <section className="lg:col-span-7 bg-white border border-[#DCE2DD] rounded-2xl p-6 space-y-5">

@@ -28,6 +28,8 @@ export const FamilyRegistry: React.FC = () => {
     setShowForm(false);
   };
 
+  if (!currentUser) return null;
+
   const startEdit = (b: FamilyBeneficiary) => {
     setEditingId(b.id);
     setFullNameAm(b.fullNameAm);

@@ -4,11 +4,14 @@
  */
 import { EdirProvider } from './context/EdirContext';
 import { AppShell } from './components/AppShell';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 export default function App() {
   return (
-    <EdirProvider>
-      <AppShell />
-    </EdirProvider>
+    <ErrorBoundary>
+      <EdirProvider>
+        <AppShell />
+      </EdirProvider>
+    </ErrorBoundary>
   );
 }

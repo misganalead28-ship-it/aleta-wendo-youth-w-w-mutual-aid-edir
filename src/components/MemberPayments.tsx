@@ -1,42 +1,77 @@
 import React, { useMemo, useState } from 'react';
-import {
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-  Copy,
-  FileText,
-  Landmark,
-  Upload,
-  XCircle,
-} from 'lucide-react';
+import { Copy, Landmark, Upload } from 'lucide-react';
 import { useEdir } from '../context/EdirContext';
 import { BANK_ACCOUNTS } from '../data/seedData';
 import { tr } from '../i18n/translations';
 import { PayableDueItem, PaymentTransaction } from '../types';
+
+function compressImageDataUrl(file: File): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        resolve(undefined);
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 800;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(undefined);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        let compressed = canvas.toDataURL('image/jpeg', 0.65);
+        if (compressed.length > 340000) {
+          compressed = canvas.toDataURL('image/jpeg', 0.45);
+        }
+        resolve(compressed.length <= 340000 ? compressed : undefined);
+      };
+      img.onerror = () => resolve(undefined);
+      img.src = reader.result;
+    };
+    reader.onerror = () => resolve(undefined);
+    reader.readAsDataURL(file);
+  });
+}
 
 export const MemberPayments: React.FC = () => {
   const {
     lang,
     currentUser,
     campaigns,
-    transactions,
     submitPaymentReceipt,
     showToast,
   } = useEdir();
 
   // Build payable items list for the signed-in member
   const payableItems: PayableDueItem[] = useMemo(() => {
+    if (!currentUser) return [];
     const items: PayableDueItem[] = [];
     if (currentUser.monthlyDueBalance > 0) {
       items.push({
         id: 'DUE-MONTHLY',
         kind: 'monthly_dues',
-        titleAm: 'የህዳር ወር መደበኛ መዋጮ',
-        titleEn: 'November 2026 Monthly Membership Dues',
+        titleAm: 'ወርሃዊ መደበኛ መዋጮ',
+        titleEn: 'Monthly Membership Dues',
         subtitleAm: 'ወርሃዊ የአባልነት መዋጮ (እስከ ወሩ 10ኛ ቀን)',
         subtitleEn: 'Standard monthly contribution (due 10th of month)',
         amountEtb: currentUser.monthlyDueBalance,
-        dueDate: '2026-11-10',
+        dueDate: new Date().toISOString().slice(0, 8) + '10',
         isOverdue: true,
       });
     }
@@ -49,7 +84,7 @@ export const MemberPayments: React.FC = () => {
         subtitleAm: 'ከወሩ የመጨረሻ ቀን በኋላ የተጨመረ ቅጣት',
         subtitleEn: 'Applied automatically after monthly cut-off date',
         amountEtb: currentUser.penaltyBalance,
-        dueDate: '2026-11-11',
+        dueDate: new Date().toISOString().slice(0, 8) + '11',
         isOverdue: true,
       });
     }
@@ -88,7 +123,8 @@ export const MemberPayments: React.FC = () => {
   const [receiptPreviewType, setReceiptPreviewType] = useState<'image' | 'pdf'>('image');
   const [receiptDataUrl, setReceiptDataUrl] = useState<string | undefined>(undefined);
   const [customAmount, setCustomAmount] = useState<string>('');
-  const [previewTxn, setPreviewTxn] = useState<PaymentTransaction | null>(null);
+
+  if (!currentUser) return null;
 
   const selectedItems = payableItems.filter((item) => selectedIds.includes(item.id));
   const computedTotal = selectedItems.reduce((sum, i) => sum + i.amountEtb, 0);
@@ -101,24 +137,21 @@ export const MemberPayments: React.FC = () => {
     setCustomAmount('');
   };
 
-  const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setReceiptFileName(file.name);
     const isPdf = file.name.toLowerCase().endsWith('.pdf');
     setReceiptPreviewType(isPdf ? 'pdf' : 'image');
     if (!isPdf) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') setReceiptDataUrl(reader.result);
-      };
-      reader.readAsDataURL(file);
+      const compressed = await compressImageDataUrl(file);
+      setReceiptDataUrl(compressed);
     } else {
       setReceiptDataUrl(undefined);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!referenceNumber.trim()) {
       showToast(
@@ -137,7 +170,7 @@ export const MemberPayments: React.FC = () => {
         ? selectedItems.map((i) => i.titleAm).join(' + ')
         : 'ቅድመ ወርሃዊ መዋጮ';
 
-    submitPaymentReceipt({
+    await submitPaymentReceipt({
       type:
         selectedItems.length > 1
           ? 'combined'
@@ -166,8 +199,6 @@ export const MemberPayments: React.FC = () => {
     navigator.clipboard?.writeText(acc);
     showToast(lang === 'am' ? `ቁጥር ${acc} ተቀድቷል።` : `Copied ${acc} to clipboard.`);
   };
-
-  const myTransactions = transactions.filter((t) => t.memberId === currentUser.id);
 
   return (
     <div className="space-y-6">
@@ -198,44 +229,52 @@ export const MemberPayments: React.FC = () => {
               </span>
             </div>
 
-            <div className="space-y-2.5">
-              {payableItems.map((item) => {
-                const checked = selectedIds.includes(item.id);
-                return (
-                  <label
-                    key={item.id}
-                    className={`flex items-start justify-between gap-3 p-3.5 rounded-xl border cursor-pointer transition-colors ${
-                      checked
-                        ? 'bg-[#F3F8F5] border-[#0E4D34]'
-                        : 'bg-[#FAFBFB] border-[#E2E6E3] hover:border-[#CBD5D0]'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleItem(item.id)}
-                        className="mt-1 w-4 h-4 accent-[#0E4D34] rounded"
-                      />
-                      <div>
-                        <p className="text-sm font-semibold text-[#0F172A]">
-                          {lang === 'am' ? item.titleAm : item.titleEn}
-                        </p>
-                        <p className="text-xs text-[#475569]">
-                          {lang === 'am' ? item.subtitleAm : item.subtitleEn} ·{' '}
-                          <span className={item.isOverdue ? 'text-[#DC2626] font-medium' : ''}>
-                            {lang === 'am' ? 'ቀነ-ገደብ' : 'Due'} {item.dueDate}
-                          </span>
-                        </p>
+            {payableItems.length === 0 ? (
+              <p className="text-xs text-[#64748B] py-2">
+                {lang === 'am'
+                  ? 'ምንም ያልተከፈለ ቀሪ ሂሳብ የለም። የቅድመ ወርሃዊ መዋጮ መክፈል ከፈለጉ ከጎን ያለውን ቅጽ ይሙሉ።'
+                  : 'No overdue dues pending. You may submit an advance monthly contribution using the receipt form.'}
+              </p>
+            ) : (
+              <div className="space-y-2.5">
+                {payableItems.map((item) => {
+                  const checked = selectedIds.includes(item.id);
+                  return (
+                    <label
+                      key={item.id}
+                      className={`flex items-start justify-between gap-3 p-3.5 rounded-xl border cursor-pointer transition-colors ${
+                        checked
+                          ? 'bg-[#F3F8F5] border-[#0E4D34]'
+                          : 'bg-[#FAFBFB] border-[#E2E6E3] hover:border-[#CBD5D0]'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleItem(item.id)}
+                          className="mt-1 w-4 h-4 accent-[#0E4D34] rounded"
+                        />
+                        <div>
+                          <p className="text-sm font-semibold text-[#0F172A]">
+                            {lang === 'am' ? item.titleAm : item.titleEn}
+                          </p>
+                          <p className="text-xs text-[#475569]">
+                            {lang === 'am' ? item.subtitleAm : item.subtitleEn} ·{' '}
+                            <span className={item.isOverdue ? 'text-[#DC2626] font-medium' : ''}>
+                              {lang === 'am' ? 'ቀነ-ገደብ' : 'Due'} {item.dueDate}
+                            </span>
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <span className="font-mono text-sm font-bold text-[#0F172A] tabular-nums shrink-0">
-                      {item.amountEtb.toLocaleString()} {tr('etb', lang)}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
+                      <span className="font-mono text-sm font-bold text-[#0F172A] tabular-nums shrink-0">
+                        {item.amountEtb.toLocaleString()} {tr('etb', lang)}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           {/* Official Edir Payment Channels */}
@@ -389,131 +428,6 @@ export const MemberPayments: React.FC = () => {
           </button>
         </form>
       </div>
-
-      {/* Receipt Verification Tracker */}
-      <section className="bg-white border border-[#DCE2DD] rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-[#E2E6E3] flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-bold text-[#0F172A]">
-              {lang === 'am' ? 'የተላኩ ደረሰኞች ሁኔታ መከታተያ' : 'My Submitted Receipts & Verification Status'}
-            </h3>
-            <p className="text-xs text-[#64748B] mt-0.5">
-              {lang === 'am'
-                ? 'በማረጋገጫ ላይ ያሉ፣ የጸደቁ እና ምክንያት የተጻፈባቸው ውድቅ ደረሰኞች'
-                : 'Track Pending Review, Approved, and Rejected receipts with Cashier feedback'}
-            </p>
-          </div>
-          <span className="text-xs font-mono text-[#64748B] tabular-nums">
-            {myTransactions.length} {lang === 'am' ? 'ደረሰኞች' : 'receipts'}
-          </span>
-        </div>
-
-        <div className="divide-y divide-[#EEF1EE]">
-          {myTransactions.map((txn) => (
-            <div key={txn.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-[#64748B]">
-                  <span className="font-mono">{txn.id}</span>
-                  <span>·</span>
-                  <span className="font-mono tabular-nums">{txn.paymentDate}</span>
-                  <span>·</span>
-                  <span>{txn.method}</span>
-                  <span>·</span>
-                  <span className="font-mono">Ref: {txn.referenceNumber}</span>
-                </div>
-                <p className="text-sm font-semibold text-[#0F172A]">
-                  {lang === 'am' ? txn.itemLabelsAm : txn.itemLabelsEn}
-                </p>
-
-                {txn.status === 'rejected' && (
-                  <p className="text-xs text-[#DC2626] bg-[#FEF2F2] border border-[#FECACA] px-3 py-1.5 rounded-lg inline-flex items-start gap-1.5 mt-1">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                    <span>
-                      <strong>{lang === 'am' ? 'የውድቅ ምክንያት፡' : 'Reason:'}</strong>{' '}
-                      {lang === 'am' ? txn.rejectionReasonAm : txn.rejectionReasonEn}
-                    </span>
-                  </p>
-                )}
-              </div>
-
-              <div className="flex items-center gap-4 shrink-0">
-                <div className="text-right">
-                  <p className="font-mono text-base font-bold text-[#0F172A] tabular-nums">
-                    {txn.amount.toLocaleString()} {tr('etb', lang)}
-                  </p>
-                  <div className="mt-0.5 text-xs">
-                    {txn.status === 'verified' && (
-                      <span className="inline-flex items-center gap-1 font-semibold text-[#16A34A]">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        {tr('statusApproved', lang)}
-                      </span>
-                    )}
-                    {txn.status === 'pending_verification' && (
-                      <span className="inline-flex items-center gap-1 font-semibold text-[#D97706]">
-                        <Clock className="w-3.5 h-3.5" />
-                        {tr('statusPendingReview', lang)}
-                      </span>
-                    )}
-                    {txn.status === 'rejected' && (
-                      <span className="inline-flex items-center gap-1 font-semibold text-[#DC2626]">
-                        <XCircle className="w-3.5 h-3.5" />
-                        {tr('statusRejected', lang)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {txn.receiptFileName && (
-                  <button
-                    type="button"
-                    onClick={() => setPreviewTxn(txn)}
-                    className="px-3 py-2 text-xs font-semibold text-[#0E4D34] bg-[#EEF3F0] rounded-lg hover:bg-[#E1ECE6] whitespace-nowrap"
-                  >
-                    {lang === 'am' ? 'ደረሰኝ እይ' : 'View File'}
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Receipt Preview Modal */}
-      {previewTxn && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white border border-[#D4DBD7] rounded-2xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-[#EEF1EE] pb-3">
-              <h4 className="text-sm font-bold text-[#0F172A]">
-                {lang === 'am' ? 'የተላከ ደረሰኝ' : 'Uploaded Receipt Details'}
-              </h4>
-              <button
-                onClick={() => setPreviewTxn(null)}
-                className="text-xs font-medium text-[#64748B] hover:text-[#0F172A]"
-              >
-                {tr('close', lang)}
-              </button>
-            </div>
-            <div className="p-5 bg-[#F8FAF9] border border-[#E2E6E3] rounded-xl text-center space-y-2">
-              {previewTxn.receiptDataUrl ? (
-                <img
-                  src={previewTxn.receiptDataUrl}
-                  alt={previewTxn.receiptFileName}
-                  className="max-h-56 mx-auto rounded-lg border border-[#D4DBD7]"
-                />
-              ) : (
-                <FileText className="w-10 h-10 text-[#0E4D34] mx-auto" />
-              )}
-              <p className="text-sm font-semibold text-[#0F172A]">{previewTxn.receiptFileName}</p>
-              <p className="text-xs font-mono text-[#475569]">
-                {previewTxn.method} · Ref: {previewTxn.referenceNumber}
-              </p>
-              <p className="text-lg font-bold font-mono text-[#0E4D34]">
-                {previewTxn.amount.toLocaleString()} {tr('etb', lang)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

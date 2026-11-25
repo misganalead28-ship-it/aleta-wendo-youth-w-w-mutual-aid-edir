@@ -56,6 +56,7 @@ export const AppShell: React.FC = () => {
   const {
     lang,
     setLang,
+    authReady,
     isAuthenticated,
     currentUser,
     signOut,
@@ -69,7 +70,25 @@ export const AppShell: React.FC = () => {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  if (!isAuthenticated) {
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-[#F5F7F5] flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <img
+          src={LOGO_PATH}
+          alt="Aleta Wondo Youth Mutual Aid Edir"
+          className="w-16 h-16 rounded-full object-cover border-2 border-[#0E4D34] bg-white animate-pulse"
+        />
+        <div className="space-y-1">
+          <p className="text-sm font-bold text-[#0E4D34]">{tr('orgFullName', lang)}</p>
+          <p className="text-xs text-[#64748B]">
+            {lang === 'am' ? 'ከFirebase ጋር በመገናኘት ላይ...' : 'Connecting to live Edir workspace...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !currentUser) {
     return (
       <>
         <SignInScreen />

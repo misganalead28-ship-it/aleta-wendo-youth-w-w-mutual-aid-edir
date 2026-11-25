@@ -58,61 +58,67 @@ export const CommitteeMessages: React.FC = () => {
 
       {/* Message List */}
       <div className="bg-white border border-[#DCE2DD] rounded-2xl divide-y divide-[#EEF1EE]">
-        {filtered.map((msg) => (
-          <div
-            key={msg.id}
-            onClick={() => markMessageRead(msg.id)}
-            className={`p-5 sm:p-6 transition-colors cursor-pointer ${
-              !msg.read ? 'bg-[#F4F8F6]' : 'bg-white hover:bg-[#FAFBFB]'
-            }`}
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span
-                  className={`font-bold uppercase ${
-                    msg.category === 'urgent'
-                      ? 'text-[#DC2626]'
-                      : msg.category === 'payments'
-                      ? 'text-[#D97706]'
-                      : 'text-[#0E4D34]'
-                  }`}
-                >
-                  {msg.category}
-                </span>
-                <span aria-hidden="true">·</span>
-                <span className="text-[#475569]">
-                  {lang === 'am' ? msg.senderAm : msg.senderEn}
-                </span>
-                {!msg.read && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span className="font-bold text-[#0E4D34]">
-                      {lang === 'am' ? 'አዲስ' : 'NEW'}
-                    </span>
-                  </>
-                )}
+        {filtered.length === 0 ? (
+          <p className="p-8 text-center text-sm text-[#64748B]">
+            {lang === 'am' ? 'እስካሁን የተላከ መልዕክት የለም።' : 'No committee messages found.'}
+          </p>
+        ) : (
+          filtered.map((msg) => (
+            <div
+              key={msg.id}
+              onClick={() => markMessageRead(msg.id)}
+              className={`p-5 sm:p-6 transition-colors cursor-pointer ${
+                !msg.read ? 'bg-[#F4F8F6]' : 'bg-white hover:bg-[#FAFBFB]'
+              }`}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span
+                    className={`font-bold uppercase ${
+                      msg.category === 'urgent'
+                        ? 'text-[#DC2626]'
+                        : msg.category === 'payments'
+                        ? 'text-[#D97706]'
+                        : 'text-[#0E4D34]'
+                    }`}
+                  >
+                    {msg.category}
+                  </span>
+                  <span aria-hidden="true">·</span>
+                  <span className="text-[#475569]">
+                    {lang === 'am' ? msg.senderAm : msg.senderEn}
+                  </span>
+                  {!msg.read && (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <span className="font-bold text-[#0E4D34]">
+                        {lang === 'am' ? 'አዲስ' : 'NEW'}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                <span className="font-mono text-xs text-[#64748B] tabular-nums">{msg.date}</span>
               </div>
 
-              <span className="font-mono text-xs text-[#64748B] tabular-nums">{msg.date}</span>
+              <h3 className="text-base font-bold text-[#0F172A] mt-2">
+                {lang === 'am' ? msg.titleAm : msg.titleEn}
+              </h3>
+              <p className="text-sm text-[#334155] mt-1 leading-relaxed">
+                {lang === 'am' ? msg.bodyAm : msg.bodyEn}
+              </p>
+
+              {!msg.read && (
+                <div className="mt-3">
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#0E4D34]">
+                    <MailOpen className="w-3.5 h-3.5" />
+                    {lang === 'am' ? 'ተነቧል ብለህ ምልክት አድርግ' : 'Click to mark as read'}
+                  </span>
+                </div>
+              )}
             </div>
-
-            <h3 className="text-base font-bold text-[#0F172A] mt-2">
-              {lang === 'am' ? msg.titleAm : msg.titleEn}
-            </h3>
-            <p className="text-sm text-[#334155] mt-1 leading-relaxed">
-              {lang === 'am' ? msg.bodyAm : msg.bodyEn}
-            </p>
-
-            {!msg.read && (
-              <div className="mt-3">
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#0E4D34]">
-                  <MailOpen className="w-3.5 h-3.5" />
-                  {lang === 'am' ? 'ተነቧል ብለህ ምልክት አድርግ' : 'Click to mark as read'}
-                </span>
-              </div>
-            )}
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

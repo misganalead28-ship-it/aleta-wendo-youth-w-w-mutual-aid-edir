@@ -1,0 +1,98 @@
+/**
+ * Payload-First Security TDD Test Suite for Aleta Wondo Youth Mutual Aid Edir
+ * Verifies the "Dirty Dozen" adversarial payloads against firestore.rules.
+ */
+export const DIRTY_DOZEN_PAYLOADS = [
+  {
+    name: '1. Unauthenticated read on /users',
+    auth: null,
+    operation: 'get',
+    path: '/users/AWY-2026-001',
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '2. Unverified email write on /requests',
+    auth: { uid: 'u1', token: { email: 'user@gmail.com', email_verified: false } },
+    operation: 'create',
+    path: '/requests/REQ-1',
+    payload: { id: 'REQ-1', ownerUid: 'u1', status: 'pending_vice_chair' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '3. Role self-escalation on create (/users)',
+    auth: { uid: 'attacker1', token: { email: 'attacker@gmail.com', email_verified: true } },
+    operation: 'create',
+    path: '/users/attacker1',
+    payload: { id: 'attacker1', authUid: 'attacker1', role: 'vice_chair', portalAccessEnabled: true },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '4. Role escalation on update (/users)',
+    auth: { uid: 'member1', token: { email: 'member1@gmail.com', email_verified: true } },
+    operation: 'update',
+    path: '/users/member1',
+    payload: { role: 'cashier' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '5. Financial balance tampering on update (/users)',
+    auth: { uid: 'member1', token: { email: 'member1@gmail.com', email_verified: true } },
+    operation: 'update',
+    path: '/users/member1',
+    payload: { monthlyDueBalance: 0, totalPaidEtb: 999999 },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '6. Shadow / Ghost field injection on /transactions',
+    auth: { uid: 'member1', token: { email: 'member1@gmail.com', email_verified: true } },
+    operation: 'create',
+    path: '/transactions/TXN-1',
+    payload: { id: 'TXN-1', ownerUid: 'member1', status: 'pending_verification', isAdminApproved: true },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '7. Receipt self-verification on create (/transactions)',
+    auth: { uid: 'member1', token: { email: 'member1@gmail.com', email_verified: true } },
+    operation: 'create',
+    path: '/transactions/TXN-2',
+    payload: { id: 'TXN-2', ownerUid: 'member1', status: 'verified' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '8. Request stage bypass on create (/requests)',
+    auth: { uid: 'member1', token: { email: 'member1@gmail.com', email_verified: true } },
+    operation: 'create',
+    path: '/requests/REQ-2',
+    payload: { id: 'REQ-2', ownerUid: 'member1', status: 'disbursed' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '9. Unauthorized user password reset by Secretary',
+    auth: { uid: 'sec1', token: { email: 'sec@gmail.com', email_verified: true } },
+    operation: 'update',
+    path: '/users/member1',
+    payload: { passwordHash: 'deadbeef' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '10. PII cross-member read on /users',
+    auth: { uid: 'member1', token: { email: 'member1@gmail.com', email_verified: true } },
+    operation: 'get',
+    path: '/users/member2',
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '11. ID poisoning with invalid characters/length',
+    auth: { uid: 'admin1', token: { email: 'misganalead28@gmail.com', email_verified: true } },
+    operation: 'create',
+    path: '/records/invalid$id with spaces',
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '12. Audit log mutation (/auditLogs)',
+    auth: { uid: 'admin1', token: { email: 'misganalead28@gmail.com', email_verified: true } },
+    operation: 'delete',
+    path: '/auditLogs/AUD-1',
+    expected: 'PERMISSION_DENIED',
+  },
+];

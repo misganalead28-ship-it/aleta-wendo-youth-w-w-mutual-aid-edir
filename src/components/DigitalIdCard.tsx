@@ -9,6 +9,8 @@ export const DigitalIdCard: React.FC = () => {
   const { currentUser, lang } = useEdir();
   const [showBothSides, setShowBothSides] = useState(true);
 
+  if (!currentUser) return null;
+
   const qrPayload = JSON.stringify({
     org: 'ALETA_WONDO_YOUTH_EDIR',
     id: currentUser.id,
@@ -118,7 +120,7 @@ export const DigitalIdCard: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="w-3.5 h-3.5 text-[#0E4D34] shrink-0" />
-                  <span className="font-mono tabular-nums">{currentUser.phone}</span>
+                  <span className="font-mono tabular-nums">{currentUser.phone || '—'}</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="inline-flex items-center gap-1">
@@ -162,9 +164,11 @@ export const DigitalIdCard: React.FC = () => {
                   <p className="text-[#64748B] font-medium">
                     {lang === 'am' ? 'የአደጋ ጊዜ ተጠሪ' : 'Emergency Contact'}
                   </p>
-                  <p className="font-semibold text-[#0F172A]">{currentUser.emergencyContactName}</p>
+                  <p className="font-semibold text-[#0F172A]">
+                    {currentUser.emergencyContactName || '—'}
+                  </p>
                   <p className="font-mono text-[#334155] tabular-nums">
-                    {currentUser.emergencyContactPhone}
+                    {currentUser.emergencyContactPhone || '—'}
                   </p>
                 </div>
 
@@ -172,7 +176,7 @@ export const DigitalIdCard: React.FC = () => {
                   <p className="text-[#64748B] font-medium">
                     {lang === 'am' ? 'አድራሻ' : 'Registered Address'}
                   </p>
-                  <p className="text-[#0F172A]">{currentUser.addressDetail}</p>
+                  <p className="text-[#0F172A]">{currentUser.addressDetail || '—'}</p>
                 </div>
 
                 <div className="pt-1 border-t border-[#EEF1EE] text-[11px] text-[#475569]">

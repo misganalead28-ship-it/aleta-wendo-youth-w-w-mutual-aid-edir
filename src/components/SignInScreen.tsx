@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import {
+  AlertTriangle,
   ArrowRight,
-  ChevronDown,
-  ChevronUp,
+  ExternalLink,
   Globe2,
   KeyRound,
+  LogOut,
   ShieldCheck,
   UserCheck,
   Users,
@@ -23,21 +24,47 @@ const MANAGEMENT_ROLES: PortalRole[] = [
 ];
 
 export const SignInScreen: React.FC = () => {
-  const { lang, setLang, signInWithRoleAndCredentials } = useEdir();
+  const {
+    lang,
+    setLang,
+    signInWithGoogle,
+    signInWithRoleAndCredentials,
+    signOut,
+    unregisteredEmail,
+    accessSuspendedMsg,
+    authErrorMsg,
+    popupBlocked,
+  } = useEdir();
 
   const [roleGroup, setRoleGroup] = useState<'member' | 'committee'>('member');
   const [committeeRole, setCommitteeRole] = useState<PortalRole>('vice_chair');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [showRef, setShowRef] = useState(false);
+  const [googleErrorMsg, setGoogleErrorMsg] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const selectedRole: PortalRole = roleGroup === 'member' ? 'member' : committeeRole;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleGoogleSignIn = async () => {
+    const signInPromise = signInWithGoogle();
+    setErrorMsg(null);
+    setGoogleErrorMsg(null);
+    setSubmitting(true);
+    const res = await signInPromise;
+    setSubmitting(false);
+    if (!res.ok) {
+      setGoogleErrorMsg(lang === 'am' ? res.errorAm || '' : res.errorEn || '');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
-    const res = signInWithRoleAndCredentials(selectedRole, identifier, password);
+    setGoogleErrorMsg(null);
+    setSubmitting(true);
+    const res = await signInWithRoleAndCredentials(selectedRole, identifier, password);
+    setSubmitting(false);
     if (!res.ok) {
       setErrorMsg(lang === 'am' ? res.errorAm || '' : res.errorEn || '');
     }
@@ -123,8 +150,8 @@ export const SignInScreen: React.FC = () => {
                 <ShieldCheck className="w-4 h-4 text-[#F5DFA9] shrink-0" />
                 <span>
                   {lang === 'am'
-                    ? 'ምክትል ሰብሳቢ የአባላት ምዝገባ እና የፖርታል አክሰስ ፍቃድ ይሰጣሉ'
-                    : 'Vice Chairperson manages member registration & portal access'}
+                    ? 'ምክትል ሰብሳቢ የተጠቃሚዎች ምዝገባ፣ የይለፍ ቃል እና የፖርታል አክሰስ ያስተዳድራሉ'
+                    : 'Vice Chairperson administers users, passwords & portal access'}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -143,6 +170,112 @@ export const SignInScreen: React.FC = () => {
             <div>
               <h2 className="text-xl font-bold text-[#0F172A]">{tr('signInTitle', lang)}</h2>
               <p className="text-sm text-[#475569] mt-1">{tr('signInSubtitle', lang)}</p>
+            </div>
+
+            {/* Unregistered / Suspended Firebase Auth State Banner */}
+            {(unregisteredEmail || accessSuspendedMsg) && (
+              <div className="p-4 bg-[#FEF2F2] border border-[#FECACA] rounded-xl space-y-3">
+                <div className="flex items-start gap-2.5 text-xs text-[#991B1B]">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-[#DC2626]" />
+                  <div className="space-y-1">
+                    <p className="font-bold">
+                      {accessSuspendedMsg
+                        ? lang === 'am'
+                          ? 'የፖርታል አክሰስ ታግዷል'
+                          : 'Account Access Suspended'
+                        : lang === 'am'
+                        ? 'መለያው በዕድሩ ገና አልተመዘገበም'
+                        : 'Email Not Registered in Edir Directory'}
+                    </p>
+                    <p>
+                      {accessSuspendedMsg ||
+                        (lang === 'am'
+                          ? `በ "${unregisteredEmail}" ገብተዋል፤ ነገር ግን ምክትል ሰብሳቢው ገና አባልነትዎን አልመዘገቡም። እባክዎ የዕድሩን ምክትል ሰብሳቢ ያነጋግሩ።`
+                          : `Signed in as "${unregisteredEmail}", which has not been registered by the Vice Chairperson yet. Please ask the Vice Chairperson to register your email.`)}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#991B1B] bg-white border border-[#FCA5A5] rounded-lg hover:bg-[#FEE2E2]"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  {lang === 'am' ? 'ውጣ / ሌላ መለያ ሞክር' : 'Sign Out / Switch Account'}
+                </button>
+              </div>
+            )}
+
+            {/* Primary Live Firebase Google Sign-In */}
+            <div className="space-y-2">
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={handleGoogleSignIn}
+                className="w-full inline-flex items-center justify-center gap-3 py-3 px-4 text-sm font-semibold text-[#0F172A] bg-white border-2 border-[#0E4D34] rounded-xl hover:bg-[#F3F8F5] transition-colors min-h-[46px] disabled:opacity-60"
+              >
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="#4285F4"
+                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24Z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14Z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96Z"
+                  />
+                </svg>
+                <span>
+                  {lang === 'am'
+                    ? 'በGoogle መለያ ይግቡ (Sign in with Google)'
+                    : 'Sign in with Google'}
+                </span>
+              </button>
+              <p className="text-[11px] text-[#64748B] text-center">
+                {lang === 'am'
+                  ? 'በምክትል ሰብሳቢ የተመዘገቡ አባላት እና የኮሚቴ አመራሮች በGoogle መለያቸው በቀጥታ ይገባሉ።'
+                  : 'Registered members & committee officers sign in with their registered Google account.'}
+              </p>
+              {(googleErrorMsg || authErrorMsg) && !unregisteredEmail && !accessSuspendedMsg && (
+                <div className="text-xs font-medium text-[#991B1B] bg-[#FEF2F2] border border-[#FECACA] px-3.5 py-3 rounded-xl space-y-2.5 break-words">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-[#DC2626]" />
+                    <span>{googleErrorMsg || authErrorMsg}</span>
+                  </div>
+                  {popupBlocked && typeof window !== 'undefined' && (
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <a
+                        href={window.location.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-[#0E4D34] rounded-lg hover:bg-[#0A3B27] transition-colors"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>
+                          {lang === 'am'
+                            ? 'በአዲስ Tab ክፈትና በGoogle ግባ'
+                            : 'Open in New Tab to Sign In'}
+                        </span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="relative flex items-center py-1">
+              <div className="flex-grow border-t border-[#E2E6E3]" />
+              <span className="shrink mx-3 text-[11px] font-medium text-[#64748B] uppercase">
+                {lang === 'am' ? 'ወይም በኢሜይልና የይለፍ ቃል' : 'Or Email & Password'}
+              </span>
+              <div className="flex-grow border-t border-[#E2E6E3]" />
             </div>
 
             {/* Role Group Selector: Member vs Committee & Management */}
@@ -210,18 +343,14 @@ export const SignInScreen: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-[#334155] mb-1.5">
-                  {tr('memberIdentifierLabel', lang)}
+                  {lang === 'am' ? 'የተመዘገበ ኢሜይል አድራሻ' : 'Registered Email Address'}
                 </label>
                 <input
-                  type="text"
+                  type="email"
                   required
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder={
-                    roleGroup === 'member'
-                      ? 'AWY-2024-001 · +251916428810 · dawit.tadesse@edir.et'
-                      : 'AWY-2024-005 · vicechair@edir.et'
-                  }
+                  placeholder="name@example.com"
                   className="w-full px-3.5 py-2.5 text-sm border border-[#CBD5D0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0E4D34]"
                 />
               </div>
@@ -244,14 +373,15 @@ export const SignInScreen: React.FC = () => {
               </div>
 
               {errorMsg && (
-                <p className="text-xs font-medium text-[#DC2626] bg-[#FEF2F2] border border-[#FECACA] px-3 py-2 rounded-lg">
+                <p className="text-xs font-medium text-[#DC2626] bg-[#FEF2F2] border border-[#FECACA] px-3 py-2 rounded-lg break-words">
                   {errorMsg}
                 </p>
               )}
 
               <button
                 type="submit"
-                className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 text-sm font-semibold text-white bg-[#0E4D34] rounded-lg hover:bg-[#0A3B27] transition-colors min-h-[44px]"
+                disabled={submitting}
+                className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 text-sm font-semibold text-white bg-[#0E4D34] rounded-lg hover:bg-[#0A3B27] transition-colors min-h-[44px] disabled:opacity-60"
               >
                 <span>
                   {tr('signInBtn', lang)} —{' '}
@@ -260,38 +390,6 @@ export const SignInScreen: React.FC = () => {
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
-
-            {/* Plain-text collapsible credential directory for verification (no clickable login buttons) */}
-            <div className="pt-3 border-t border-[#E2E6E3]">
-              <button
-                type="button"
-                onClick={() => setShowRef((v) => !v)}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-[#475569] hover:text-[#0E4D34]"
-              >
-                {showRef ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                {lang === 'am'
-                  ? 'የተመዘገቡ መለያዎች መመሪያ (ለፈተና/ማረጋገጫ)'
-                  : 'Registered Account Directory Reference'}
-              </button>
-
-              {showRef && (
-                <div className="mt-2.5 p-3.5 bg-[#F8FAF9] border border-[#DCE2DD] rounded-xl text-[11px] text-[#334155] space-y-1 font-mono">
-                  <p className="font-sans font-semibold text-[#0E4D34] mb-1">
-                    {lang === 'am'
-                      ? 'የሁሉም መለያዎች ነባሪ የይለፍ ቃል፡ edir2026'
-                      : 'Default password for registered accounts: edir2026'}
-                  </p>
-                  <p>Member (Local): AWY-2024-001 · dawit.tadesse@edir.et</p>
-                  <p>Member (Diaspora): AWY-2024-004 · samuel.yohannes@edir.et</p>
-                  <p>Vice Chair: AWY-2024-005 · vicechair@edir.et</p>
-                  <p>Chairperson: AWY-2024-003 · chair@edir.et</p>
-                  <p>Secretary: AWY-2024-002 · secretary@edir.et</p>
-                  <p>Cashier: AWY-2024-006 · cashier@edir.et</p>
-                  <p>Public Relations: AWY-2024-007 · pr@edir.et</p>
-                  <p>Auditor: AWY-2024-008 · auditor@edir.et</p>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </main>

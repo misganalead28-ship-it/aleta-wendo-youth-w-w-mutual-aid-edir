@@ -27,7 +27,9 @@ export const ImportRecordsModule: React.FC = () => {
   const [attachedDataUrl, setAttachedDataUrl] = useState<string | undefined>(undefined);
   const [importedRowCount, setImportedRowCount] = useState<number | undefined>(undefined);
 
-  const canImport = currentUser.role !== 'member' && currentUser.role !== 'auditor';
+  const canImport = Boolean(currentUser && currentUser.role !== 'member' && currentUser.role !== 'auditor');
+
+  if (!currentUser) return null;
 
   const formatBytes = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -329,47 +331,55 @@ export const ImportRecordsModule: React.FC = () => {
           </div>
 
           <div className="divide-y divide-[#EEF1EE]">
-            {records.map((doc) => (
-              <div key={doc.id} className="p-4 sm:p-5 flex items-start justify-between gap-4">
-                <div className="min-w-0 space-y-1">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-[#64748B]">
-                    <span className="font-semibold text-[#0E4D34]">{doc.code}</span>
-                    <span>·</span>
-                    <span className="uppercase">{doc.recordType.replace('_', ' ')}</span>
-                    <span>·</span>
-                    <span className="font-mono tabular-nums">{doc.date}</span>
-                  </div>
-                  <p className="text-sm font-bold text-[#0F172A]">
-                    {lang === 'am' ? doc.titleAm : doc.titleEn}
-                  </p>
-                  <p className="text-xs text-[#475569] line-clamp-2">
-                    {lang === 'am' ? doc.summaryAm : doc.summaryEn}
-                  </p>
-                  {doc.attachedFileName && (
-                    <p className="text-xs font-mono text-[#0E4D34] inline-flex items-center gap-1.5 pt-0.5">
-                      {doc.importedRowCount ? (
-                        <FileSpreadsheet className="w-3.5 h-3.5" />
-                      ) : (
-                        <FileText className="w-3.5 h-3.5" />
-                      )}
-                      <span>{doc.attachedFileName}</span>
-                      {doc.importedRowCount ? (
-                        <span className="text-[#B8821E]">({doc.importedRowCount} rows)</span>
-                      ) : null}
+            {records.length === 0 ? (
+              <p className="p-8 text-center text-xs text-[#64748B]">
+                {lang === 'am'
+                  ? 'እስካሁን የገባ መዝገብ የለም። በግራ በኩል ያለውን ቅጽ በመጠቀም የመጀመሪያውን መዝገብ ይጫኑ።'
+                  : 'No records uploaded yet. Use the form on the left to import bylaws, minutes, or ledgers.'}
+              </p>
+            ) : (
+              records.map((doc) => (
+                <div key={doc.id} className="p-4 sm:p-5 flex items-start justify-between gap-4">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-[#64748B]">
+                      <span className="font-semibold text-[#0E4D34]">{doc.code}</span>
+                      <span>·</span>
+                      <span className="uppercase">{doc.recordType.replace('_', ' ')}</span>
+                      <span>·</span>
+                      <span className="font-mono tabular-nums">{doc.date}</span>
+                    </div>
+                    <p className="text-sm font-bold text-[#0F172A]">
+                      {lang === 'am' ? doc.titleAm : doc.titleEn}
                     </p>
-                  )}
-                </div>
+                    <p className="text-xs text-[#475569] line-clamp-2">
+                      {lang === 'am' ? doc.summaryAm : doc.summaryEn}
+                    </p>
+                    {doc.attachedFileName && (
+                      <p className="text-xs font-mono text-[#0E4D34] inline-flex items-center gap-1.5 pt-0.5">
+                        {doc.importedRowCount ? (
+                          <FileSpreadsheet className="w-3.5 h-3.5" />
+                        ) : (
+                          <FileText className="w-3.5 h-3.5" />
+                        )}
+                        <span>{doc.attachedFileName}</span>
+                        {doc.importedRowCount ? (
+                          <span className="text-[#B8821E]">({doc.importedRowCount} rows)</span>
+                        ) : null}
+                      </p>
+                    )}
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleDownload(doc)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0E4D34] bg-[#EEF3F0] rounded-lg hover:bg-[#E1ECE6] whitespace-nowrap shrink-0"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  {lang === 'am' ? 'አውርድ' : 'Download'}
-                </button>
-              </div>
-            ))}
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(doc)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0E4D34] bg-[#EEF3F0] rounded-lg hover:bg-[#E1ECE6] whitespace-nowrap shrink-0"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    {lang === 'am' ? 'አውርድ' : 'Download'}
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </section>
       </div>

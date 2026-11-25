@@ -1,0 +1,702 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Global Helpers
+    // -------------------------------------------------------------------------
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 2 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email is string
+        && request.auth.token.email.size() >= 3;
+    }
+
+    function userEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    // Bootstrapped Admin from runtime owner email
+    function isAdmin() {
+      return isVerifiedUser() && userEmail() == 'misganalead28@gmail.com';
+    }
+
+    function hasCommitteeRole(allowedRoles) {
+      return isVerifiedUser()
+        && exists(/databases/$(database)/documents/committee_roster/$(userEmail()))
+        && get(/databases/$(database)/documents/committee_roster/$(userEmail())).data.active == true
+        && get(/databases/$(database)/documents/committee_roster/$(userEmail())).data.role in allowedRoles;
+    }
+
+    function isViceChair() {
+      return isAdmin() || hasCommitteeRole(['vice_chair']);
+    }
+
+    function isChair() {
+      return isAdmin() || hasCommitteeRole(['chairperson']);
+    }
+
+    function isCashier() {
+      return isAdmin() || hasCommitteeRole(['cashier']);
+    }
+
+    function isSecretary() {
+      return isAdmin() || hasCommitteeRole(['secretary']);
+    }
+
+    function isPR() {
+      return isAdmin() || hasCommitteeRole(['pr']);
+    }
+
+    function isCommitteeWriter() {
+      return isAdmin() || hasCommitteeRole(['vice_chair', 'chairperson', 'secretary', 'cashier', 'pr']);
+    }
+
+    function isAnyCommittee() {
+      return isAdmin() || hasCommitteeRole(['vice_chair', 'chairperson', 'secretary', 'cashier', 'pr', 'auditor']);
+    }
+
+    function isValidEmailList(listVal) {
+      return listVal is list && listVal.size() <= 15
+        && (listVal.size() == 0 || (listVal[0] is string && listVal[0].size() <= 180));
+    }
+
+    function isValidBeneficiaryList(listVal) {
+      return listVal is list && listVal.size() <= 20
+        && (listVal.size() == 0 || listVal[0] is map);
+    }
+
+    // -------------------------------------------------------------------------
+    // Entity Validation Blueprints
+    // -------------------------------------------------------------------------
+    function isValidOrgStanding(data) {
+      return data.keys().hasAll([
+          'orgId', 'committeeEmails', 'totalActiveMembers', 'localMembers',
+          'outOfTownMembers', 'totalCollectedEtb', 'totalDisbursedEtb', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'orgId', 'committeeEmails', 'totalActiveMembers', 'localMembers',
+          'outOfTownMembers', 'totalCollectedEtb', 'totalDisbursedEtb', 'updatedAt'
+        ])
+        && data.orgId == 'aleta-wondo-edir'
+        && isValidEmailList(data.committeeEmails)
+        && data.totalActiveMembers is number && data.totalActiveMembers >= 0
+        && data.localMembers is number && data.localMembers >= 0
+        && data.outOfTownMembers is number && data.outOfTownMembers >= 0
+        && data.totalCollectedEtb is number && data.totalCollectedEtb >= 0
+        && data.totalDisbursedEtb is number && data.totalDisbursedEtb >= 0
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserAccount(data) {
+      return data.keys().hasAll([
+          'id', 'authUid', 'role', 'fullNameAm', 'fullNameEn', 'roleTitleAm', 'roleTitleEn',
+          'phone', 'email', 'passwordHash', 'city', 'country', 'addressDetail',
+          'residenceType', 'joinDate', 'bloodType', 'emergencyContactName',
+          'emergencyContactPhone', 'photoUrl', 'status', 'portalAccessEnabled',
+          'monthlyDueBalance', 'penaltyBalance', 'specialDueBalance', 'totalPaidEtb',
+          'lastPaidMonth', 'beneficiaries', 'committeeEmails', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'authUid', 'role', 'fullNameAm', 'fullNameEn', 'roleTitleAm', 'roleTitleEn',
+          'phone', 'email', 'passwordHash', 'city', 'country', 'addressDetail',
+          'residenceType', 'joinDate', 'bloodType', 'emergencyContactName',
+          'emergencyContactPhone', 'photoUrl', 'status', 'portalAccessEnabled',
+          'monthlyDueBalance', 'penaltyBalance', 'specialDueBalance', 'totalPaidEtb',
+          'lastPaidMonth', 'beneficiaries', 'committeeEmails', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.authUid is string && data.authUid.size() <= 128
+        && data.role in ['member', 'vice_chair', 'chairperson', 'secretary', 'cashier', 'pr', 'auditor']
+        && data.fullNameAm is string && data.fullNameAm.size() >= 1 && data.fullNameAm.size() <= 160
+        && data.fullNameEn is string && data.fullNameEn.size() >= 1 && data.fullNameEn.size() <= 160
+        && data.roleTitleAm is string && data.roleTitleAm.size() <= 160
+        && data.roleTitleEn is string && data.roleTitleEn.size() <= 160
+        && data.phone is string && data.phone.size() <= 40
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 180
+        && data.passwordHash is string && data.passwordHash.size() <= 128
+        && data.city is string && data.city.size() <= 100
+        && data.country is string && data.country.size() <= 100
+        && data.addressDetail is string && data.addressDetail.size() <= 250
+        && data.residenceType in ['local', 'out_of_town']
+        && data.joinDate is string && data.joinDate.size() <= 32
+        && data.bloodType is string && data.bloodType.size() <= 10
+        && data.emergencyContactName is string && data.emergencyContactName.size() <= 160
+        && data.emergencyContactPhone is string && data.emergencyContactPhone.size() <= 40
+        && data.photoUrl is string && data.photoUrl.size() <= 512
+        && data.status in ['active', 'pending_chair', 'suspended']
+        && data.portalAccessEnabled is bool
+        && data.monthlyDueBalance is number && data.monthlyDueBalance >= 0
+        && data.penaltyBalance is number && data.penaltyBalance >= 0
+        && data.specialDueBalance is number && data.specialDueBalance >= 0
+        && data.totalPaidEtb is number && data.totalPaidEtb >= 0
+        && data.lastPaidMonth is string && data.lastPaidMonth.size() <= 32
+        && isValidBeneficiaryList(data.beneficiaries)
+        && isValidEmailList(data.committeeEmails)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCommitteeRosterEntry(data) {
+      return data.keys().hasAll(['email', 'role', 'active', 'updatedAt'])
+        && data.keys().hasOnly(['email', 'role', 'active', 'updatedAt'])
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 180
+        && data.role in ['vice_chair', 'chairperson', 'secretary', 'cashier', 'pr', 'auditor']
+        && data.active is bool
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll([
+          'id', 'memberId', 'ownerUid', 'memberEmail', 'memberNameAm', 'memberNameEn',
+          'type', 'itemLabelsEn', 'itemLabelsAm', 'amount', 'method', 'referenceNumber',
+          'paymentDate', 'submittedDate', 'receiptFileName', 'receiptPreviewType',
+          'receiptDataUrl', 'status', 'rejectionReasonAm', 'rejectionReasonEn',
+          'verifiedBy', 'committeeEmails', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'memberId', 'ownerUid', 'memberEmail', 'memberNameAm', 'memberNameEn',
+          'type', 'itemLabelsEn', 'itemLabelsAm', 'amount', 'method', 'referenceNumber',
+          'paymentDate', 'submittedDate', 'receiptFileName', 'receiptPreviewType',
+          'receiptDataUrl', 'status', 'rejectionReasonAm', 'rejectionReasonEn',
+          'verifiedBy', 'committeeEmails', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.memberId is string && data.memberId.size() >= 2 && data.memberId.size() <= 128
+        && data.ownerUid is string && data.ownerUid.size() >= 1 && data.ownerUid.size() <= 128
+        && data.memberEmail is string && data.memberEmail.size() <= 180
+        && data.memberNameAm is string && data.memberNameAm.size() <= 160
+        && data.memberNameEn is string && data.memberNameEn.size() <= 160
+        && data.type in ['monthly_dues', 'penalty_settlement', 'special_campaign', 'combined']
+        && data.itemLabelsEn is string && data.itemLabelsEn.size() <= 300
+        && data.itemLabelsAm is string && data.itemLabelsAm.size() <= 300
+        && data.amount is number && data.amount > 0 && data.amount <= 1000000
+        && data.method in ['Telebirr', 'CBE Birr', 'CBE Bank Transfer', 'Awash Bank']
+        && data.referenceNumber is string && data.referenceNumber.size() >= 1 && data.referenceNumber.size() <= 120
+        && data.paymentDate is string && data.paymentDate.size() <= 32
+        && data.submittedDate is string && data.submittedDate.size() <= 32
+        && data.receiptFileName is string && data.receiptFileName.size() <= 200
+        && data.receiptPreviewType in ['image', 'pdf']
+        && data.receiptDataUrl is string && data.receiptDataUrl.size() <= 350000
+        && data.status in ['pending_verification', 'verified', 'rejected']
+        && data.rejectionReasonAm is string && data.rejectionReasonAm.size() <= 400
+        && data.rejectionReasonEn is string && data.rejectionReasonEn.size() <= 400
+        && data.verifiedBy is string && data.verifiedBy.size() <= 160
+        && isValidEmailList(data.committeeEmails)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMemberRequest(data) {
+      return data.keys().hasAll([
+          'id', 'memberId', 'ownerUid', 'memberEmail', 'memberNameAm', 'memberNameEn',
+          'requestType', 'titleAm', 'titleEn', 'description', 'requestedDate',
+          'requestedAmountEtb', 'attachmentName', 'submittedDate', 'status',
+          'committeeResponseAm', 'committeeResponseEn', 'committeeEmails', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'memberId', 'ownerUid', 'memberEmail', 'memberNameAm', 'memberNameEn',
+          'requestType', 'titleAm', 'titleEn', 'description', 'requestedDate',
+          'requestedAmountEtb', 'attachmentName', 'submittedDate', 'status',
+          'committeeResponseAm', 'committeeResponseEn', 'committeeEmails', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.memberId is string && data.memberId.size() >= 2 && data.memberId.size() <= 128
+        && data.ownerUid is string && data.ownerUid.size() >= 1 && data.ownerUid.size() <= 128
+        && data.memberEmail is string && data.memberEmail.size() <= 180
+        && data.memberNameAm is string && data.memberNameAm.size() <= 160
+        && data.memberNameEn is string && data.memberNameEn.size() <= 160
+        && data.requestType in ['asset_rental', 'benefit_claim', 'profile_update', 'general_inquiry']
+        && data.titleAm is string && data.titleAm.size() >= 1 && data.titleAm.size() <= 200
+        && data.titleEn is string && data.titleEn.size() >= 1 && data.titleEn.size() <= 200
+        && data.description is string && data.description.size() >= 1 && data.description.size() <= 2000
+        && data.requestedDate is string && data.requestedDate.size() <= 32
+        && data.requestedAmountEtb is number && data.requestedAmountEtb >= 0
+        && data.attachmentName is string && data.attachmentName.size() <= 200
+        && data.submittedDate is string && data.submittedDate.size() <= 32
+        && data.status in ['pending_vice_chair', 'pending_chair', 'pending_cashier', 'approved', 'disbursed', 'rejected']
+        && data.committeeResponseAm is string && data.committeeResponseAm.size() <= 500
+        && data.committeeResponseEn is string && data.committeeResponseEn.size() <= 500
+        && isValidEmailList(data.committeeEmails)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCampaign(data) {
+      return data.keys().hasAll([
+          'id', 'orgId', 'titleAm', 'titleEn', 'category', 'contributionMode',
+          'targetAmountPerMember', 'totalGoal', 'collectedAmount', 'deadline',
+          'status', 'descriptionAm', 'descriptionEn', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'orgId', 'titleAm', 'titleEn', 'category', 'contributionMode',
+          'targetAmountPerMember', 'totalGoal', 'collectedAmount', 'deadline',
+          'status', 'descriptionAm', 'descriptionEn', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.orgId == 'aleta-wondo-edir'
+        && data.titleAm is string && data.titleAm.size() <= 200
+        && data.titleEn is string && data.titleEn.size() <= 200
+        && data.category in ['wedding', 'bereavement', 'asset_purchase', 'medical', 'other']
+        && data.contributionMode in ['fixed', 'voluntary']
+        && data.targetAmountPerMember is number && data.targetAmountPerMember >= 0
+        && data.totalGoal is number && data.totalGoal >= 0
+        && data.collectedAmount is number && data.collectedAmount >= 0
+        && data.deadline is string && data.deadline.size() <= 32
+        && data.status in ['active', 'closed']
+        && data.descriptionAm is string && data.descriptionAm.size() <= 1000
+        && data.descriptionEn is string && data.descriptionEn.size() <= 1000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMeeting(data) {
+      return data.keys().hasAll([
+          'id', 'orgId', 'titleAm', 'titleEn', 'date', 'time', 'locationAm',
+          'locationEn', 'agendaAm', 'agendaEn', 'qrToken', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'orgId', 'titleAm', 'titleEn', 'date', 'time', 'locationAm',
+          'locationEn', 'agendaAm', 'agendaEn', 'qrToken', 'status', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.orgId == 'aleta-wondo-edir'
+        && data.titleAm is string && data.titleAm.size() <= 200
+        && data.titleEn is string && data.titleEn.size() <= 200
+        && data.date is string && data.date.size() <= 32
+        && data.time is string && data.time.size() <= 64
+        && data.locationAm is string && data.locationAm.size() <= 200
+        && data.locationEn is string && data.locationEn.size() <= 200
+        && data.agendaAm is string && data.agendaAm.size() <= 2000
+        && data.agendaEn is string && data.agendaEn.size() <= 2000
+        && data.qrToken is string && data.qrToken.size() <= 128
+        && data.status in ['live', 'upcoming', 'completed']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMeetingAttendance(data) {
+      return data.keys().hasAll(['memberId', 'ownerUid', 'status', 'checkedInAt', 'method', 'committeeEmails', 'updatedAt'])
+        && data.keys().hasOnly(['memberId', 'ownerUid', 'status', 'checkedInAt', 'method', 'committeeEmails', 'updatedAt'])
+        && data.memberId is string && data.memberId.size() >= 2 && data.memberId.size() <= 128
+        && data.ownerUid is string && data.ownerUid.size() >= 1 && data.ownerUid.size() <= 128
+        && data.status in ['present', 'geo_exempt', 'absent']
+        && data.checkedInAt is string && data.checkedInAt.size() <= 64
+        && data.method in ['qr_scan', 'auto_geo']
+        && isValidEmailList(data.committeeEmails)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidEdirRecord(data) {
+      return data.keys().hasAll([
+          'id', 'orgId', 'recordType', 'code', 'titleAm', 'titleEn', 'date', 'author',
+          'summaryAm', 'summaryEn', 'contentAm', 'contentEn', 'attachedFileName',
+          'attachedFileSize', 'attachedDataUrl', 'importedRowCount', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'orgId', 'recordType', 'code', 'titleAm', 'titleEn', 'date', 'author',
+          'summaryAm', 'summaryEn', 'contentAm', 'contentEn', 'attachedFileName',
+          'attachedFileSize', 'attachedDataUrl', 'importedRowCount', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.orgId == 'aleta-wondo-edir'
+        && data.recordType in ['bylaw', 'minutes', 'policy', 'financial_sheet', 'member_sheet']
+        && data.code is string && data.code.size() <= 100
+        && data.titleAm is string && data.titleAm.size() <= 200
+        && data.titleEn is string && data.titleEn.size() <= 200
+        && data.date is string && data.date.size() <= 32
+        && data.author is string && data.author.size() <= 160
+        && data.summaryAm is string && data.summaryAm.size() <= 500
+        && data.summaryEn is string && data.summaryEn.size() <= 500
+        && data.contentAm is string && data.contentAm.size() <= 20000
+        && data.contentEn is string && data.contentEn.size() <= 20000
+        && data.attachedFileName is string && data.attachedFileName.size() <= 200
+        && data.attachedFileSize is string && data.attachedFileSize.size() <= 40
+        && data.attachedDataUrl is string && data.attachedDataUrl.size() <= 450000
+        && data.importedRowCount is number && data.importedRowCount >= 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCommitteeMessage(data) {
+      return data.keys().hasAll([
+          'id', 'orgId', 'category', 'titleAm', 'titleEn', 'bodyAm', 'bodyEn',
+          'senderAm', 'senderEn', 'date', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'orgId', 'category', 'titleAm', 'titleEn', 'bodyAm', 'bodyEn',
+          'senderAm', 'senderEn', 'date', 'createdAt'
+        ])
+        && isValidId(data.id)
+        && data.orgId == 'aleta-wondo-edir'
+        && data.category in ['urgent', 'meetings', 'payments', 'general']
+        && data.titleAm is string && data.titleAm.size() <= 200
+        && data.titleEn is string && data.titleEn.size() <= 200
+        && data.bodyAm is string && data.bodyAm.size() <= 2000
+        && data.bodyEn is string && data.bodyEn.size() <= 2000
+        && data.senderAm is string && data.senderAm.size() <= 160
+        && data.senderEn is string && data.senderEn.size() <= 160
+        && data.date is string && data.date.size() <= 32
+        && data.createdAt is timestamp;
+    }
+
+    function isValidAssetItem(data) {
+      return data.keys().hasAll([
+          'id', 'orgId', 'nameAm', 'nameEn', 'category', 'totalQuantity',
+          'availableQuantity', 'dailyRentalFeeEtb', 'condition', 'storageLocation', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'orgId', 'nameAm', 'nameEn', 'category', 'totalQuantity',
+          'availableQuantity', 'dailyRentalFeeEtb', 'condition', 'storageLocation', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.orgId == 'aleta-wondo-edir'
+        && data.nameAm is string && data.nameAm.size() <= 200
+        && data.nameEn is string && data.nameEn.size() <= 200
+        && data.category in ['tent', 'chair', 'utensil', 'electronics']
+        && data.totalQuantity is number && data.totalQuantity >= 0
+        && data.availableQuantity is number && data.availableQuantity >= 0
+        && data.dailyRentalFeeEtb is number && data.dailyRentalFeeEtb >= 0
+        && data.condition in ['good', 'fair']
+        && data.storageLocation is string && data.storageLocation.size() <= 200
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDirective(data) {
+      return data.keys().hasAll([
+          'id', 'orgId', 'titleAm', 'titleEn', 'description', 'assignedToRole',
+          'dueDate', 'status', 'issuedBy', 'committeeEmails', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'orgId', 'titleAm', 'titleEn', 'description', 'assignedToRole',
+          'dueDate', 'status', 'issuedBy', 'committeeEmails', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.orgId == 'aleta-wondo-edir'
+        && data.titleAm is string && data.titleAm.size() <= 200
+        && data.titleEn is string && data.titleEn.size() <= 200
+        && data.description is string && data.description.size() <= 1000
+        && data.assignedToRole in ['member', 'vice_chair', 'chairperson', 'secretary', 'cashier', 'pr', 'auditor']
+        && data.dueDate is string && data.dueDate.size() <= 32
+        && data.status in ['assigned', 'in_progress', 'completed']
+        && data.issuedBy is string && data.issuedBy.size() <= 160
+        && isValidEmailList(data.committeeEmails)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll([
+          'id', 'orgId', 'timestamp', 'actorName', 'actorUid', 'actorRole',
+          'action', 'detailsAm', 'detailsEn', 'committeeEmails', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'orgId', 'timestamp', 'actorName', 'actorUid', 'actorRole',
+          'action', 'detailsAm', 'detailsEn', 'committeeEmails', 'createdAt'
+        ])
+        && isValidId(data.id)
+        && data.orgId == 'aleta-wondo-edir'
+        && data.timestamp is string && data.timestamp.size() <= 64
+        && data.actorName is string && data.actorName.size() <= 160
+        && data.actorUid == request.auth.uid
+        && data.actorRole in ['member', 'vice_chair', 'chairperson', 'secretary', 'cashier', 'pr', 'auditor']
+        && data.action is string && data.action.size() <= 80
+        && data.detailsAm is string && data.detailsAm.size() <= 500
+        && data.detailsEn is string && data.detailsEn.size() <= 500
+        && isValidEmailList(data.committeeEmails)
+        && data.createdAt is timestamp;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Rules
+    // -------------------------------------------------------------------------
+    match /test/connection {
+      allow get: if isSignedIn();
+    }
+
+    match /org/standing {
+      allow get: if isVerifiedUser();
+      allow create, update: if isVerifiedUser()
+        && isValidOrgStanding(incoming())
+        && incoming().updatedAt == request.time
+        && isCommitteeWriter();
+    }
+
+    match /committee_roster/{emailKey} {
+      allow get: if isVerifiedUser() && (emailKey == userEmail() || isViceChair() || isAdmin());
+      allow list: if isVerifiedUser() && (isAdmin() || resource.data.email == userEmail());
+      allow create, update: if isVerifiedUser()
+        && isValidCommitteeRosterEntry(incoming())
+        && incoming().updatedAt == request.time
+        && (isViceChair() || isAdmin())
+        && emailKey == incoming().email.lower();
+      allow delete: if isVerifiedUser() && (isViceChair() || isAdmin());
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isVerifiedUser() && (
+        userId == request.auth.uid
+        || isAdmin()
+        || isAnyCommittee()
+        || (resource != null && (existing().authUid == request.auth.uid || existing().email == userEmail()))
+      );
+
+      allow list: if isVerifiedUser() && (
+        isAdmin()
+        || resource.data.authUid == request.auth.uid
+        || resource.data.email == userEmail()
+        || userEmail() in resource.data.committeeEmails
+      );
+
+      allow create: if isValidId(userId)
+        && isVerifiedUser()
+        && isValidUserAccount(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (isAdmin() && userId == request.auth.uid && incoming().authUid == request.auth.uid)
+          || isViceChair()
+          || isChair()
+          || (isSecretary() && incoming().role == 'member' && incoming().status == 'pending_chair' && incoming().portalAccessEnabled == false)
+        );
+
+      allow update: if isValidId(userId)
+        && isVerifiedUser()
+        && isValidUserAccount(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isViceChair()
+          || (isChair()
+              && incoming().diff(existing()).affectedKeys().hasOnly([
+                'status', 'portalAccessEnabled', 'fullNameAm', 'fullNameEn',
+                'phone', 'city', 'country', 'addressDetail', 'residenceType',
+                'emergencyContactName', 'emergencyContactPhone', 'updatedAt'
+              ]))
+          || (isCashier()
+              && incoming().diff(existing()).affectedKeys().hasOnly(['monthlyDueBalance', 'penaltyBalance', 'specialDueBalance', 'totalPaidEtb', 'lastPaidMonth', 'updatedAt']))
+          || ((existing().authUid == request.auth.uid || (existing().authUid == '' && existing().email == userEmail()))
+              && incoming().authUid == request.auth.uid
+              && incoming().email == existing().email
+              && incoming().role == existing().role
+              && incoming().diff(existing()).affectedKeys().hasOnly(['authUid', 'beneficiaries', 'photoUrl', 'updatedAt']))
+        );
+
+      allow delete: if isValidId(userId) && isVerifiedUser() && (isViceChair() || isChair());
+    }
+
+    match /transactions/{txnId} {
+      allow get: if isValidId(txnId) && isVerifiedUser() && (
+        isAdmin()
+        || isAnyCommittee()
+        || (resource != null && (existing().ownerUid == request.auth.uid || existing().memberEmail == userEmail()))
+      );
+
+      allow list: if isVerifiedUser() && (
+        isAdmin()
+        || resource.data.ownerUid == request.auth.uid
+        || resource.data.memberEmail == userEmail()
+        || userEmail() in resource.data.committeeEmails
+      );
+
+      allow create: if isValidId(txnId)
+        && isVerifiedUser()
+        && isValidTransaction(incoming())
+        && incoming().ownerUid == request.auth.uid
+        && incoming().status == 'pending_verification'
+        && incoming().verifiedBy == ''
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidId(txnId)
+        && isVerifiedUser()
+        && isValidTransaction(incoming())
+        && incoming().id == existing().id
+        && incoming().ownerUid == existing().ownerUid
+        && incoming().memberId == existing().memberId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || ((isCashier() || isViceChair() || isChair())
+              && existing().status == 'pending_verification'
+              && incoming().status in ['verified', 'rejected']
+              && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'verifiedBy', 'rejectionReasonAm', 'rejectionReasonEn', 'updatedAt']))
+        );
+
+      allow delete: if isValidId(txnId) && isVerifiedUser() && (isChair() || isAdmin());
+    }
+
+    match /requests/{reqId} {
+      allow get: if isValidId(reqId) && isVerifiedUser() && (
+        isAdmin()
+        || isAnyCommittee()
+        || (resource != null && (existing().ownerUid == request.auth.uid || existing().memberEmail == userEmail()))
+      );
+
+      allow list: if isVerifiedUser() && (
+        isAdmin()
+        || resource.data.ownerUid == request.auth.uid
+        || resource.data.memberEmail == userEmail()
+        || userEmail() in resource.data.committeeEmails
+      );
+
+      allow create: if isValidId(reqId)
+        && isVerifiedUser()
+        && isValidMemberRequest(incoming())
+        && incoming().ownerUid == request.auth.uid
+        && incoming().status == 'pending_vice_chair'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidId(reqId)
+        && isVerifiedUser()
+        && isValidMemberRequest(incoming())
+        && incoming().id == existing().id
+        && incoming().ownerUid == existing().ownerUid
+        && incoming().memberId == existing().memberId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (isViceChair()
+              && existing().status == 'pending_vice_chair'
+              && incoming().status in ['pending_cashier', 'pending_chair', 'approved', 'rejected']
+              && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'committeeResponseAm', 'committeeResponseEn', 'updatedAt']))
+          || (isChair()
+              && existing().status == 'pending_chair'
+              && incoming().status in ['approved', 'rejected']
+              && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'committeeResponseAm', 'committeeResponseEn', 'updatedAt']))
+          || (isCashier()
+              && existing().status == 'pending_cashier'
+              && incoming().status == 'disbursed'
+              && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'committeeResponseAm', 'committeeResponseEn', 'updatedAt']))
+        );
+
+      allow delete: if isValidId(reqId) && isVerifiedUser() && (isChair() || isViceChair());
+    }
+
+    match /campaigns/{campaignId} {
+      allow get: if isValidId(campaignId) && isVerifiedUser() && (resource == null || existing().orgId == 'aleta-wondo-edir');
+      allow list: if isVerifiedUser() && resource.data.orgId == 'aleta-wondo-edir';
+      allow create: if isValidId(campaignId) && isVerifiedUser() && isCommitteeWriter()
+        && isValidCampaign(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(campaignId) && isVerifiedUser() && isCommitteeWriter()
+        && isValidCampaign(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isValidId(campaignId) && isVerifiedUser() && (isChair() || isViceChair());
+    }
+
+    match /meetings/{meetingId} {
+      allow get: if isValidId(meetingId) && isVerifiedUser() && (resource == null || existing().orgId == 'aleta-wondo-edir');
+      allow list: if isVerifiedUser() && resource.data.orgId == 'aleta-wondo-edir';
+      allow create: if isValidId(meetingId) && isVerifiedUser() && (isSecretary() || isViceChair() || isChair() || isPR())
+        && isValidMeeting(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(meetingId) && isVerifiedUser() && (isSecretary() || isViceChair() || isChair() || isPR())
+        && isValidMeeting(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isValidId(meetingId) && isVerifiedUser() && (isChair() || isViceChair());
+
+      match /attendance/{memberId} {
+        allow get: if isValidId(meetingId) && isValidId(memberId) && isVerifiedUser()
+          && (isAdmin() || isAnyCommittee() || (resource != null && existing().ownerUid == request.auth.uid));
+        allow list: if isVerifiedUser() && (
+          isAdmin()
+          || resource.data.ownerUid == request.auth.uid
+          || userEmail() in resource.data.committeeEmails
+        );
+        allow create, update: if isValidId(meetingId) && isValidId(memberId) && isVerifiedUser()
+          && exists(/databases/$(database)/documents/meetings/$(meetingId))
+          && isValidMeetingAttendance(incoming())
+          && incoming().updatedAt == request.time
+          && (incoming().ownerUid == request.auth.uid || isSecretary() || isViceChair());
+      }
+    }
+
+    match /records/{recordId} {
+      allow get: if isValidId(recordId) && isVerifiedUser() && (resource == null || existing().orgId == 'aleta-wondo-edir');
+      allow list: if isVerifiedUser() && resource.data.orgId == 'aleta-wondo-edir';
+      allow create: if isValidId(recordId) && isVerifiedUser() && isCommitteeWriter()
+        && isValidEdirRecord(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(recordId) && isVerifiedUser() && isCommitteeWriter()
+        && isValidEdirRecord(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isValidId(recordId) && isVerifiedUser() && (isChair() || isPR() || isViceChair());
+    }
+
+    match /messages/{messageId} {
+      allow get: if isValidId(messageId) && isVerifiedUser() && (resource == null || existing().orgId == 'aleta-wondo-edir');
+      allow list: if isVerifiedUser() && resource.data.orgId == 'aleta-wondo-edir';
+      allow create: if isValidId(messageId) && isVerifiedUser() && (isPR() || isViceChair() || isChair() || isSecretary())
+        && isValidCommitteeMessage(incoming())
+        && incoming().createdAt == request.time;
+      allow update: if isValidId(messageId) && isVerifiedUser() && (isPR() || isViceChair() || isChair() || isSecretary())
+        && isValidCommitteeMessage(incoming())
+        && incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(messageId) && isVerifiedUser() && (isPR() || isChair() || isViceChair());
+    }
+
+    match /assets/{assetId} {
+      allow get: if isValidId(assetId) && isVerifiedUser() && (resource == null || existing().orgId == 'aleta-wondo-edir');
+      allow list: if isVerifiedUser() && resource.data.orgId == 'aleta-wondo-edir';
+      allow create, update: if isValidId(assetId) && isVerifiedUser() && (isViceChair() || isChair() || isSecretary())
+        && isValidAssetItem(incoming())
+        && incoming().updatedAt == request.time;
+      allow delete: if isValidId(assetId) && isVerifiedUser() && (isChair() || isViceChair());
+    }
+
+    match /directives/{directiveId} {
+      allow get: if isValidId(directiveId) && isVerifiedUser() && isAnyCommittee();
+      allow list: if isVerifiedUser() && (isAdmin() || userEmail() in resource.data.committeeEmails);
+      allow create: if isValidId(directiveId) && isVerifiedUser() && (isChair() || isViceChair())
+        && isValidDirective(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(directiveId) && isVerifiedUser() && isCommitteeWriter()
+        && isValidDirective(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (isChair() || isAdmin() || (existing().status != 'completed' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])));
+    }
+
+    match /auditLogs/{logId} {
+      allow get: if isValidId(logId) && isVerifiedUser() && isAnyCommittee();
+      allow list: if isVerifiedUser() && (isAdmin() || userEmail() in resource.data.committeeEmails);
+      allow create: if isValidId(logId) && isVerifiedUser() && isCommitteeWriter()
+        && isValidAuditLog(incoming())
+        && incoming().createdAt == request.time;
+    }
+  }
+}

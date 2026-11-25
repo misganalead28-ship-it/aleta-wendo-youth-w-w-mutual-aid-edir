@@ -114,68 +114,76 @@ export const MemberRecords: React.FC = () => {
       </div>
 
       {/* Records List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filtered.map((doc) => (
-          <article
-            key={doc.id}
-            className="bg-white border border-[#DCE2DD] rounded-2xl p-5 flex flex-col justify-between space-y-4"
-          >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2 text-xs text-[#64748B]">
-                <span className="font-semibold text-[#0E4D34]">
-                  {doc.code} · {categoryLabel(doc.recordType)}
-                </span>
-                <span className="font-mono tabular-nums">{doc.date}</span>
-              </div>
-              <h3 className="text-base font-bold text-[#0F172A]">
-                {lang === 'am' ? doc.titleAm : doc.titleEn}
-              </h3>
-              <p className="text-sm text-[#475569] leading-relaxed">
-                {lang === 'am' ? doc.summaryAm : doc.summaryEn}
-              </p>
-
-              {doc.attachedFileName && (
-                <div className="inline-flex items-center gap-1.5 text-xs font-medium text-[#0E4D34] pt-1">
-                  {doc.importedRowCount ? (
-                    <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
-                  ) : (
-                    <Paperclip className="w-3.5 h-3.5 shrink-0" />
-                  )}
-                  <span className="font-mono truncate max-w-[230px]">{doc.attachedFileName}</span>
-                  {doc.attachedFileSize && (
-                    <span className="text-[#64748B]">({doc.attachedFileSize})</span>
-                  )}
-                  {doc.importedRowCount ? (
-                    <span className="text-[#B8821E] font-mono">
-                      · {doc.importedRowCount} {lang === 'am' ? 'መስመሮች' : 'rows'}
-                    </span>
-                  ) : null}
+      {filtered.length === 0 ? (
+        <div className="bg-white border border-[#DCE2DD] rounded-2xl p-8 text-center text-sm text-[#64748B]">
+          {lang === 'am'
+            ? 'እስካሁን የገባ መዝገብ የለም። ኮሚቴው ህገ ደንብ ወይም ቃለ ጉባኤ ሲጭን እዚህ ይታያል።'
+            : 'No records found yet. Official bylaws, minutes, and spreadsheets imported by the committee will appear here.'}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filtered.map((doc) => (
+            <article
+              key={doc.id}
+              className="bg-white border border-[#DCE2DD] rounded-2xl p-5 flex flex-col justify-between space-y-4"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2 text-xs text-[#64748B]">
+                  <span className="font-semibold text-[#0E4D34]">
+                    {doc.code} · {categoryLabel(doc.recordType)}
+                  </span>
+                  <span className="font-mono tabular-nums">{doc.date}</span>
                 </div>
-              )}
-            </div>
+                <h3 className="text-base font-bold text-[#0F172A]">
+                  {lang === 'am' ? doc.titleAm : doc.titleEn}
+                </h3>
+                <p className="text-sm text-[#475569] leading-relaxed">
+                  {lang === 'am' ? doc.summaryAm : doc.summaryEn}
+                </p>
 
-            <div className="pt-3 border-t border-[#EEF1EE] flex items-center justify-between gap-2">
-              <span className="text-xs text-[#64748B] truncate">{doc.author}</span>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => setOpenDoc(doc)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#0E4D34] rounded-lg hover:bg-[#0A3B27]"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  {lang === 'am' ? 'ሙሉውን አንብብ' : 'Read Full'}
-                </button>
-                <button
-                  onClick={() => handleDownload(doc)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0F172A] border border-[#D4DBD7] rounded-lg hover:bg-[#F4F6F5]"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  {lang === 'am' ? 'አውርድ' : 'Download'}
-                </button>
+                {doc.attachedFileName && (
+                  <div className="inline-flex items-center gap-1.5 text-xs font-medium text-[#0E4D34] pt-1">
+                    {doc.importedRowCount ? (
+                      <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
+                    ) : (
+                      <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                    )}
+                    <span className="font-mono truncate max-w-[230px]">{doc.attachedFileName}</span>
+                    {doc.attachedFileSize && (
+                      <span className="text-[#64748B]">({doc.attachedFileSize})</span>
+                    )}
+                    {doc.importedRowCount ? (
+                      <span className="text-[#B8821E] font-mono">
+                        · {doc.importedRowCount} {lang === 'am' ? 'መስመሮች' : 'rows'}
+                      </span>
+                    ) : null}
+                  </div>
+                )}
               </div>
-            </div>
-          </article>
-        ))}
-      </div>
+
+              <div className="pt-3 border-t border-[#EEF1EE] flex items-center justify-between gap-2">
+                <span className="text-xs text-[#64748B] truncate">{doc.author}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setOpenDoc(doc)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#0E4D34] rounded-lg hover:bg-[#0A3B27]"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    {lang === 'am' ? 'ሙሉውን አንብብ' : 'Read Full'}
+                  </button>
+                  <button
+                    onClick={() => handleDownload(doc)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0F172A] border border-[#D4DBD7] rounded-lg hover:bg-[#F4F6F5]"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    {lang === 'am' ? 'አውርድ' : 'Download'}
+                  </button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
 
       {/* Full Record Reader Modal */}
       {openDoc && (

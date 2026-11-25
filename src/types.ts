@@ -45,6 +45,7 @@ export interface FamilyBeneficiary {
 
 export interface UserAccount {
   id: string;
+  authUid: string;
   role: PortalRole;
   fullNameAm: string;
   fullNameEn: string;
@@ -52,13 +53,13 @@ export interface UserAccount {
   roleTitleEn: string;
   phone: string;
   email: string;
-  password: string;
+  passwordHash: string;
   city: string;
   country: string;
   addressDetail: string;
   residenceType: ResidenceType;
   joinDate: string;
-  bloodType?: string;
+  bloodType: string;
   emergencyContactName: string;
   emergencyContactPhone: string;
   photoUrl: string;
@@ -70,6 +71,17 @@ export interface UserAccount {
   totalPaidEtb: number;
   lastPaidMonth: string;
   beneficiaries: FamilyBeneficiary[];
+  committeeEmails: string[];
+}
+
+export interface OrgStanding {
+  orgId: string;
+  committeeEmails: string[];
+  totalActiveMembers: number;
+  localMembers: number;
+  outOfTownMembers: number;
+  totalCollectedEtb: number;
+  totalDisbursedEtb: number;
 }
 
 export interface PayableDueItem {
@@ -88,6 +100,8 @@ export interface PayableDueItem {
 export interface PaymentTransaction {
   id: string;
   memberId: string;
+  ownerUid: string;
+  memberEmail: string;
   memberNameAm: string;
   memberNameEn: string;
   type: 'monthly_dues' | 'penalty_settlement' | 'special_campaign' | 'combined';
@@ -98,17 +112,19 @@ export interface PaymentTransaction {
   referenceNumber: string;
   paymentDate: string;
   submittedDate: string;
-  receiptFileName?: string;
-  receiptPreviewType?: 'image' | 'pdf';
-  receiptDataUrl?: string;
+  receiptFileName: string;
+  receiptPreviewType: 'image' | 'pdf';
+  receiptDataUrl: string;
   status: 'pending_verification' | 'verified' | 'rejected';
-  rejectionReasonAm?: string;
-  rejectionReasonEn?: string;
-  verifiedBy?: string;
+  rejectionReasonAm: string;
+  rejectionReasonEn: string;
+  verifiedBy: string;
+  committeeEmails: string[];
 }
 
 export interface SpecialCampaign {
   id: string;
+  orgId: string;
   titleAm: string;
   titleEn: string;
   category: 'wedding' | 'bereavement' | 'asset_purchase' | 'medical' | 'other';
@@ -125,15 +141,17 @@ export interface SpecialCampaign {
 export interface MemberRequest {
   id: string;
   memberId: string;
+  ownerUid: string;
+  memberEmail: string;
   memberNameAm: string;
   memberNameEn: string;
   requestType: 'asset_rental' | 'benefit_claim' | 'profile_update' | 'general_inquiry';
   titleAm: string;
   titleEn: string;
   description: string;
-  requestedDate?: string;
-  requestedAmountEtb?: number;
-  attachmentName?: string;
+  requestedDate: string;
+  requestedAmountEtb: number;
+  attachmentName: string;
   submittedDate: string;
   status:
     | 'pending_vice_chair'
@@ -142,19 +160,23 @@ export interface MemberRequest {
     | 'approved'
     | 'disbursed'
     | 'rejected';
-  committeeResponseAm?: string;
-  committeeResponseEn?: string;
+  committeeResponseAm: string;
+  committeeResponseEn: string;
+  committeeEmails: string[];
 }
 
 export interface MeetingAttendanceRecord {
   memberId: string;
+  ownerUid: string;
   status: 'present' | 'geo_exempt' | 'absent';
-  checkedInAt?: string;
-  method?: 'qr_scan' | 'auto_geo';
+  checkedInAt: string;
+  method: 'qr_scan' | 'auto_geo';
+  committeeEmails: string[];
 }
 
 export interface Meeting {
   id: string;
+  orgId: string;
   titleAm: string;
   titleEn: string;
   date: string;
@@ -170,6 +192,7 @@ export interface Meeting {
 
 export interface EdirRecordDoc {
   id: string;
+  orgId: string;
   recordType: 'bylaw' | 'minutes' | 'policy' | 'financial_sheet' | 'member_sheet';
   code: string;
   titleAm: string;
@@ -180,14 +203,15 @@ export interface EdirRecordDoc {
   summaryEn: string;
   contentAm: string;
   contentEn: string;
-  attachedFileName?: string;
-  attachedFileSize?: string;
-  attachedDataUrl?: string;
-  importedRowCount?: number;
+  attachedFileName: string;
+  attachedFileSize: string;
+  attachedDataUrl: string;
+  importedRowCount: number;
 }
 
 export interface AssetItem {
   id: string;
+  orgId: string;
   nameAm: string;
   nameEn: string;
   category: 'tent' | 'chair' | 'utensil' | 'electronics';
@@ -212,6 +236,7 @@ export interface BenefitRule {
 
 export interface CommitteeMessage {
   id: string;
+  orgId: string;
   category: 'urgent' | 'meetings' | 'payments' | 'general';
   titleAm: string;
   titleEn: string;
@@ -220,11 +245,12 @@ export interface CommitteeMessage {
   senderAm: string;
   senderEn: string;
   date: string;
-  read: boolean;
+  read?: boolean;
 }
 
 export interface Directive {
   id: string;
+  orgId: string;
   titleAm: string;
   titleEn: string;
   description: string;
@@ -232,21 +258,18 @@ export interface Directive {
   dueDate: string;
   status: 'assigned' | 'in_progress' | 'completed';
   issuedBy: string;
+  committeeEmails: string[];
 }
 
 export interface AuditLogEntry {
   id: string;
+  orgId: string;
   timestamp: string;
   actorName: string;
+  actorUid: string;
   actorRole: PortalRole;
   action: string;
   detailsAm: string;
   detailsEn: string;
-}
-
-export interface MonthlyTreasuryPoint {
-  monthAm: string;
-  monthEn: string;
-  collectedEtb: number;
-  disbursedEtb: number;
+  committeeEmails: string[];
 }

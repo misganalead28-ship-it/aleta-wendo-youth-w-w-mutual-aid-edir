@@ -20,6 +20,8 @@ import { MemberAvatar } from './MemberAvatar';
 export const MemberDashboard: React.FC = () => {
   const { lang, currentUser, meetings, messages, setActiveTab } = useEdir();
 
+  if (!currentUser) return null;
+
   const totalPending =
     currentUser.monthlyDueBalance +
     currentUser.penaltyBalance +
@@ -188,12 +190,20 @@ export const MemberDashboard: React.FC = () => {
             <CalendarClock className="w-4 h-4 text-[#0E4D34]" />
           </div>
           <div className="mt-3">
-            <p className="text-sm font-bold text-[#0F172A] line-clamp-2">
-              {lang === 'am' ? liveMeeting.titleAm : liveMeeting.titleEn}
-            </p>
-            <p className="text-xs font-mono text-[#475569] mt-1 tabular-nums">
-              {liveMeeting.date} · {liveMeeting.time}
-            </p>
+            {liveMeeting ? (
+              <>
+                <p className="text-sm font-bold text-[#0F172A] line-clamp-2">
+                  {lang === 'am' ? liveMeeting.titleAm : liveMeeting.titleEn}
+                </p>
+                <p className="text-xs font-mono text-[#475569] mt-1 tabular-nums">
+                  {liveMeeting.date} · {liveMeeting.time}
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-[#64748B]">
+                {lang === 'am' ? 'እስካሁን የታቀደ ስብሰባ የለም' : 'No upcoming meetings scheduled'}
+              </p>
+            )}
           </div>
           <button
             onClick={() => setActiveTab('qr_scanner')}
@@ -307,30 +317,36 @@ export const MemberDashboard: React.FC = () => {
             </div>
 
             <div className="divide-y divide-[#EEF1EE] mt-2">
-              {recentMessages.map((msg) => (
-                <div key={msg.id} className="py-3.5 space-y-1">
-                  <div className="flex items-center justify-between text-[11px] text-[#64748B]">
-                    <span
-                      className={`font-semibold ${
-                        msg.category === 'urgent'
-                          ? 'text-[#DC2626]'
-                          : msg.category === 'payments'
-                          ? 'text-[#D97706]'
-                          : 'text-[#0E4D34]'
-                      }`}
-                    >
-                      {msg.category.toUpperCase()} {!msg.read ? '· UNREAD' : ''}
-                    </span>
-                    <span className="font-mono tabular-nums">{msg.date}</span>
+              {recentMessages.length === 0 ? (
+                <p className="py-6 text-xs text-[#64748B] text-center">
+                  {lang === 'am' ? 'እስካሁን የተላከ የኮሚቴ መልዕክት የለም።' : 'No committee notices published yet.'}
+                </p>
+              ) : (
+                recentMessages.map((msg) => (
+                  <div key={msg.id} className="py-3.5 space-y-1">
+                    <div className="flex items-center justify-between text-[11px] text-[#64748B]">
+                      <span
+                        className={`font-semibold ${
+                          msg.category === 'urgent'
+                            ? 'text-[#DC2626]'
+                            : msg.category === 'payments'
+                            ? 'text-[#D97706]'
+                            : 'text-[#0E4D34]'
+                        }`}
+                      >
+                        {msg.category.toUpperCase()} {!msg.read ? '· UNREAD' : ''}
+                      </span>
+                      <span className="font-mono tabular-nums">{msg.date}</span>
+                    </div>
+                    <p className="text-sm font-semibold text-[#0F172A]">
+                      {lang === 'am' ? msg.titleAm : msg.titleEn}
+                    </p>
+                    <p className="text-xs text-[#475569] line-clamp-2">
+                      {lang === 'am' ? msg.bodyAm : msg.bodyEn}
+                    </p>
                   </div>
-                  <p className="text-sm font-semibold text-[#0F172A]">
-                    {lang === 'am' ? msg.titleAm : msg.titleEn}
-                  </p>
-                  <p className="text-xs text-[#475569] line-clamp-2">
-                    {lang === 'am' ? msg.bodyAm : msg.bodyEn}
-                  </p>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
